@@ -143,7 +143,7 @@ const PropertyDetail = ({ property }: PropertyDetailProps) => {
           </div>
           
           <div className="absolute bottom-4 left-0 w-full flex justify-center space-x-2">
-            {property.images.map((_, index: number) => (
+            {property.images.map((_: string, index: number) => (
               <button
                 key={index}
                 className={`w-2 h-2 rounded-full transition-colors ${

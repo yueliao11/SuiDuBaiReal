@@ -31,16 +31,6 @@ const WalletConnect = () => {
           <span>Connect Wallet</span>
         </Button>
       }
-      connectedText={(address) => (
-        <Button variant="outline" className="flex items-center space-x-2">
-          <Wallet className="h-4 w-4" />
-          <span>{`${address.slice(0, 6)}...${address.slice(-4)}`}</span>
-              </Button>
-      )}
-      connectModalOptions={{
-        title: "Connect Wallet",
-        description: "Connect a Sui wallet to browse and invest in Dubai real estate tokens."
-      }}
     />
   );
 };

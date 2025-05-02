@@ -6,7 +6,6 @@ import { Vote, Info, Check, X, Clock, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
@@ -277,7 +276,12 @@ function ProposalCard({ proposal, selectedVote, setSelectedVote, onVote }: Propo
               <span>For ({forPercentage.toFixed(1)}%)</span>
               <span>{proposal.votesFor.toLocaleString()} RWAS</span>
             </div>
-            <Progress value={forPercentage} className="bg-muted h-2" />
+            <div className="bg-muted h-2 w-full rounded-full">
+              <div 
+                className="bg-primary h-full rounded-full" 
+                style={{ width: `${forPercentage}%` }}
+              ></div>
+            </div>
           </div>
           
           <div>
@@ -285,7 +289,12 @@ function ProposalCard({ proposal, selectedVote, setSelectedVote, onVote }: Propo
               <span>Against ({againstPercentage.toFixed(1)}%)</span>
               <span>{proposal.votesAgainst.toLocaleString()} RWAS</span>
             </div>
-            <Progress value={againstPercentage} className="bg-muted h-2" />
+            <div className="bg-muted h-2 w-full rounded-full">
+              <div 
+                className="bg-primary h-full rounded-full" 
+                style={{ width: `${againstPercentage}%` }}
+              ></div>
+            </div>
           </div>
           
           <div>
@@ -293,7 +302,12 @@ function ProposalCard({ proposal, selectedVote, setSelectedVote, onVote }: Propo
               <span>Abstain ({abstainPercentage.toFixed(1)}%)</span>
               <span>{proposal.votesAbstain.toLocaleString()} RWAS</span>
             </div>
-            <Progress value={abstainPercentage} className="bg-muted h-2" />
+            <div className="bg-muted h-2 w-full rounded-full">
+              <div 
+                className="bg-primary h-full rounded-full" 
+                style={{ width: `${abstainPercentage}%` }}
+              ></div>
+            </div>
           </div>
         </div>
 
@@ -302,7 +316,12 @@ function ProposalCard({ proposal, selectedVote, setSelectedVote, onVote }: Propo
             <span>Quorum Progress</span>
             <span>{quorumPercentage.toFixed(1)}%</span>
           </div>
-          <Progress value={quorumPercentage} className="bg-muted h-2" />
+          <div className="bg-muted h-2 w-full rounded-full">
+            <div 
+              className="bg-primary h-full rounded-full" 
+              style={{ width: `${quorumPercentage}%` }}
+            ></div>
+          </div>
         </div>
 
         {proposal.status === 'active' && !proposal.myVote && (

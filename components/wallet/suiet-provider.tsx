@@ -35,12 +35,6 @@ export function SuietProvider({ children }: SuietProviderProps) {
     <WalletProvider 
       defaultWallets={[...AllDefaultWallets, slushWalletConfig]}
       autoConnect={true}
-      features={{
-        // 设置按钮文本
-        customUI: {
-          connectButtonInnerContent: 'Connect Wallet',
-        }
-      }}
     >
       <WalletStatusMonitor>
         {children}
