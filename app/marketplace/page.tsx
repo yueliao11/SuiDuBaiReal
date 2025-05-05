@@ -2,7 +2,6 @@ import PropertyFilters from '@/components/marketplace/property-filters';
 import PropertyGrid from '@/components/marketplace/property-grid';
 import { Suspense } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
-import ClientWalletInteraction from '@/components/wallet/client-wallet-interaction';
 
 export default function Marketplace() {
   return (
@@ -14,8 +13,6 @@ export default function Marketplace() {
           Filter by location, property type, or expected yield to find your ideal investment.
         </p>
       </div>
-      
-      <ClientWalletInteraction />
       
       <PropertyFilters />
       

@@ -1,7 +1,7 @@
 "use client";
 
 import { SuiClientProvider as DappKitSuiClientProvider } from '@mysten/dapp-kit';
-import { getFullnodeUrl } from '@mysten/sui.js/client';
+import { getFullnodeUrl } from '@mysten/sui/client';
 import { ReactNode, useState, useEffect } from 'react';
 
 const NETWORK = 'testnet'; // 'mainnet' 或 'testnet' 或 'devnet'

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSuiWallet } from '@/hooks/use-suiet-wallet';
 import { TrendingUp, BadgeDollarSign, Info, History } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -11,6 +11,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import ClientSuietConnect from '@/components/wallet/client-suiet-connect';
+import { suiClient } from "@/config";
+import { queryBalance, stake } from '@/contracts';
 
 // Mock staking data - in a real app this would come from the blockchain
 const stakingData = {
@@ -48,8 +50,29 @@ export default function Staking() {
   const [stakeAmount, setStakeAmount] = useState('');
   const [unstakeAmount, setUnstakeAmount] = useState('');
   const [activeTab, setActiveTab] = useState('stake');
+  const [availableBalance, setAvailableBalance] = useState(0);
 
-  const handleStake = () => {
+  useEffect(() => {
+    const fetchBalance = async () => {
+      if (isConnected && wallet.address) {
+        try {
+          const result = await queryBalance(wallet.address);
+          setAvailableBalance(Number(result.totalBalance) / 1e9);
+        } catch (error) {
+          console.error('Error fetching balance:', error);
+          toast({
+            variant: "destructive",
+            title: "Error",
+            description: "Failed to fetch balance",
+          });
+        }
+      }
+    };
+
+    fetchBalance();
+  }, [isConnected, wallet.address, toast]);
+
+  const handleStake = async () => {
     if (!isConnected) {
       toast({
         variant: "destructive",
@@ -69,7 +92,7 @@ export default function Staking() {
       return;
     }
 
-    if (amount > stakingData.availableBalance) {
+    if (amount > availableBalance) {
       toast({
         variant: "destructive",
         title: "Insufficient balance",
@@ -78,12 +101,51 @@ export default function Staking() {
       return;
     }
 
-    // Mock successful stake
-    toast({
-      title: "Staking successful",
-      description: `Successfully staked ${amount} RWAS tokens`,
-    });
-    setStakeAmount('');
+    try {
+      const tx = await stake(wallet.address!, amount * 1e9); // Convert to base units
+      // Here you would typically sign and execute the transaction
+      if (!wallet.signAndExecuteTransaction) {
+        throw new Error("Wallet does not support signing transactions.");
+      }
+
+      const result = await wallet.signAndExecuteTransaction({
+        transaction: tx,
+      });
+
+      // Wait for transaction confirmation (optional but recommended for UI feedback)
+      await suiClient.waitForTransaction({ 
+        digest: result.digest,
+        options: { showEffects: true }
+      });
+
+      // Check transaction status (example)
+      const txDetails = await suiClient.getTransactionBlock({
+        digest: result.digest,
+        options: { showEffects: true }
+      });
+
+      if (txDetails.effects?.status.status === 'success') {
+        toast({
+          title: "Staking successful",
+          description: `Successfully staked ${amount} RWAS tokens`,
+        });
+      } else {
+        throw new Error(`Staking transaction failed with status: ${txDetails.effects?.status.status}`);
+      }
+
+      setStakeAmount('');
+      
+      // Refresh balance after staking
+      const balanceResult = await queryBalance(wallet.address!);
+      setAvailableBalance(Number(balanceResult.totalBalance) / 1e9);
+    } catch (error) {
+      console.error('Error staking:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to stake tokens",
+      });
+    }
   };
 
   const handleUnstake = () => {
@@ -227,7 +289,7 @@ export default function Staking() {
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
                       <span>Available Balance</span>
-                      <span>{stakingData.availableBalance.toLocaleString()} RWAS</span>
+                      <span>{availableBalance.toLocaleString()} RWAS</span>
                     </div>
                     <div className="flex space-x-2">
                       <Input

@@ -25,6 +25,8 @@ import { Area, AreaChart, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContai
 import { useSuiWallet } from '@/hooks/use-suiet-wallet';
 import { useToast } from '@/hooks/use-toast';
 import ClientSuietConnect from '@/components/wallet/client-suiet-connect';
+import { purchaseYieldToken } from '@/contracts';
+import { suiClient } from '@/config';
 
 interface PropertyDetailProps {
   property: any;
@@ -112,6 +114,65 @@ const PropertyDetail = ({ property }: PropertyDetailProps) => {
     });
   };
 
+  const handleBuy = async () => {
+    if (!isConnected || !wallet.address) {
+      toast({
+        variant: "destructive",
+        title: "Wallet not connected",
+        description: "Please connect your wallet to buy tokens",
+      });
+      return;
+    }
+
+    if (investmentAmount <= 0) {
+      toast({
+        variant: "destructive",
+        title: "Invalid amount",
+        description: "Please enter a valid amount to purchase",
+      });
+      return;
+    }
+
+    console.log(`Attempting to purchase with ${investmentAmount} USDC for ${wallet.address}`);
+
+    try {
+      const tx = await purchaseYieldToken(investmentAmount * 1e9, wallet.address);
+
+      if (!wallet.signAndExecuteTransaction) {
+        throw new Error("Wallet does not support signing transactions.");
+      }
+
+      const result = await wallet.signAndExecuteTransaction({ transaction: tx });
+
+      await suiClient.waitForTransaction({ 
+        digest: result.digest,
+        options: { showEffects: true }
+      });
+
+      const txDetails = await suiClient.getTransactionBlock({
+        digest: result.digest,
+        options: { showEffects: true }
+      });
+
+      if (txDetails.effects?.status.status === 'success') {
+        toast({
+          title: "Purchase successful",
+          description: `Successfully purchased ${tokensToReceive} ${property.tokenSymbol} tokens for $${investmentAmount.toFixed(2)} USDC`,
+        });
+      } else {
+        throw new Error(`Purchase transaction failed with status: ${txDetails.effects?.status.status}`);
+      }
+
+    } catch (error) {
+      console.error("Error purchasing tokens:", error);
+      toast({
+        variant: "destructive",
+        title: "Purchase failed",
+        description: error instanceof Error ? error.message : "An unknown error occurred",
+      });
+    }
+  };
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
       <div className="lg:col-span-2 space-y-8">
@@ -129,6 +190,7 @@ const PropertyDetail = ({ property }: PropertyDetailProps) => {
               size="icon" 
               className="h-10 w-10 rounded-full bg-black/30 text-white hover:bg-black/50"
               onClick={prevImage}
+              aria-label="Previous Image"
             >
               <ChevronLeft className="h-6 w-6" />
             </Button>
@@ -137,6 +199,7 @@ const PropertyDetail = ({ property }: PropertyDetailProps) => {
               size="icon" 
               className="h-10 w-10 rounded-full bg-black/30 text-white hover:bg-black/50"
               onClick={nextImage}
+              aria-label="Next Image"
             >
               <ChevronRight className="h-6 w-6" />
             </Button>
@@ -150,6 +213,7 @@ const PropertyDetail = ({ property }: PropertyDetailProps) => {
                   index === currentImageIndex ? 'bg-white' : 'bg-white/50'
                 }`}
                 onClick={() => setCurrentImageIndex(index)}
+                aria-label={`Go to image ${index + 1}`}
               />
             ))}
           </div>
@@ -355,93 +419,120 @@ const PropertyDetail = ({ property }: PropertyDetailProps) => {
         </Tabs>
       </div>
       
-      {/* Investment Panel */}
-      <div className="space-y-6">
-        <Card>
+      {/* Investment Card */}
+      <div className="lg:col-span-1 space-y-6">
+        <Card className="sticky top-24">
           <CardHeader>
             <CardTitle>Invest in {property.tokenSymbol}</CardTitle>
             <CardDescription>
-              Receive annual profits in USDC stablecoin
+              Purchase tokens representing fractional ownership and earn yield.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div>
-              <Label htmlFor="investment-amount">Investment Amount (USDC)</Label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
-                <Input
-                  id="investment-amount"
-                  type="number"
-                  min="100"
-                  step="10"
-                  className="pl-7"
-                  value={investmentAmount}
-                  onChange={handleInvestmentChange}
-                />
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">Minimum $100</p>
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Token Price</span>
+              <span className="font-semibold">${property.price.toFixed(2)} / token</span>
             </div>
             
-            <div>
-              <Label htmlFor="tokens-to-receive">Tokens to Receive</Label>
-              <Input
-                id="tokens-to-receive"
-                type="number"
-                min="0"
-                value={tokensToReceive}
-                onChange={handleTokensChange}
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                @ ${property.price} per token
-              </p>
-            </div>
-            
-            <div className="pt-2 space-y-3">
-              <div className="flex justify-between">
-                <span>Annual Yield (Est):</span>
-                <span className="font-medium text-green-500">{property.expectedYield}%</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Expected Annual Return:</span>
-                <span className="font-medium">
-                  ${((investmentAmount * property.expectedYield) / 100).toFixed(2)}
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Your Wallet</span>
+              {isConnected ? (
+                <span className="font-mono text-sm truncate max-w-[150px]" title={wallet.address}>
+                  {wallet.address?.slice(0, 6)}...{wallet.address?.slice(-4)}
                 </span>
-              </div>
-              <div className="flex justify-between">
-                <span>Next Distribution:</span>
-                <span className="font-medium">Jan 2026</span>
-              </div>
+              ) : (
+                <span className="text-sm text-muted-foreground">Not Connected</span>
+              )}
             </div>
             
-            <KycStatusAlert status={kycStatus} />
-          </CardContent>
-          <CardFooter className="flex-col space-y-2">
-            {!isConnected ? (
-              <div className="w-full flex justify-center">
-                <ClientSuietConnect />
+            {/* Conditional rendering for property ID '1' */} 
+            {property.id === '1' ? (
+              // --- Buy Logic for Property 1 (KYC assumed passed) ---
+              <div className="space-y-4 pt-4">
+                <div className="space-y-2">
+                  <Label htmlFor="tokensToReceive">Tokens to Receive</Label>
+                  <Input 
+                    id="tokensToReceive"
+                    type="number"
+                    placeholder="Enter number of tokens"
+                    value={tokensToReceive}
+                    onChange={handleTokensChange}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="investmentAmount">Estimated Cost (USD)</Label>
+                  <Input 
+                    id="investmentAmount"
+                    type="number" 
+                    placeholder="Amount in USD" 
+                    value={investmentAmount}
+                    readOnly // Make this read-only as it depends on tokens
+                    className="bg-muted/50"
+                  />
+                </div>
               </div>
             ) : (
-              <Button 
-                className="w-full bg-gradient-to-r from-blue-500 to-teal-400 hover:from-blue-600 hover:to-teal-500"
-                size="lg"
-                disabled={kycStatus !== 'verified' || investmentAmount < 100}
-                onClick={handleInvest}
-              >
-                {kycStatus !== 'verified'
-                  ? 'Complete KYC to Invest'
-                  : 'Invest Now'
-                }
-              </Button>
+              // --- Existing Investment Logic for other properties ---
+              <div className="space-y-4 pt-4">
+                 <div className="space-y-2">
+                  <Label htmlFor="investmentAmount">Amount to Invest (USD)</Label>
+                  <Input 
+                    id="investmentAmount"
+                    type="number" 
+                    placeholder="Min $100" 
+                    value={investmentAmount}
+                    onChange={handleInvestmentChange}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="tokensToReceive">Estimated Tokens</Label>
+                  <Input 
+                    id="tokensToReceive"
+                    type="number"
+                    placeholder="Tokens you receive"
+                    value={tokensToReceive}
+                    readOnly
+                    className="bg-muted/50"
+                  />
+                </div>
+                 {isConnected && <KycStatusAlert status={kycStatus} />}
+              </div>
             )}
-            
-            {kycStatus !== 'verified' && (
-              <Button 
-                variant="outline" 
-                className="w-full" 
-                asChild
-              >
-                <a href="/compliance">Complete KYC Verification</a>
-              </Button>
+          </CardContent>
+          <CardFooter>
+            {isConnected ? (
+              property.id === '1' ? (
+                // --- Buy Button for Property 1 ---
+                <Button 
+                  className="w-full" 
+                  onClick={handleBuy} 
+                  disabled={tokensToReceive <= 0} // Basic validation
+                >
+                  Buy {property.tokenSymbol} Tokens
+                </Button>
+              ) : (
+                // --- Existing Invest/KYC Button Logic ---
+                kycStatus === 'verified' ? (
+                  <Button 
+                    className="w-full" 
+                    onClick={handleInvest} 
+                    disabled={investmentAmount < 100} // Example validation
+                  >
+                    Invest Now
+                  </Button>
+                ) : (
+                  <Button 
+                    className="w-full" 
+                    // onClick={handleStartKyc} // Assuming a KYC function exists
+                    variant={kycStatus === 'pending' ? 'outline' : 'default'}
+                    disabled={kycStatus === 'pending'}
+                  >
+                    {kycStatus === 'pending' ? 'KYC Pending Review' : 'Complete KYC Verification'}
+                  </Button>
+                )
+              )
+            ) : (
+              <ClientSuietConnect />
             )}
           </CardFooter>
         </Card>

@@ -1,6 +1,6 @@
 module suidubaireal::yield_token;
-use sui::coin;
-use sui::coin::{TreasuryCap, CoinMetadata};
+
+use sui::coin::{Self, TreasuryCap, CoinMetadata, Coin};
 use sui::table::{Self, Table};
 
 use suidubaireal::spd_management::{AdminCap, is_admin, not_admin};
@@ -64,6 +64,23 @@ public fun mint<T>(
     };
     // mint yield token
     coin::mint_and_transfer(&mut yield_token_info.yield_token_treasury_cap, amount, recipient, ctx);
+}
+
+// 使用 usdc 来直接购买 yield token
+public fun purchase_yield_token<T, U>(
+    yield_token_info: &mut YieldTokenInfo<T>,
+    usdc: Coin<U>,
+    recipient: address,
+    ctx: &mut TxContext
+) {
+    // 获取传入的 usdc 余额
+    let usdc_balance = usdc.value();
+    // 将 usdc 数量按照 80% 的比例兑换为 yield token
+    let yield_token_amount = usdc_balance * 4 / 5;
+    // 接受发送的 usdc
+    transfer::public_transfer(usdc, @admin);
+    // mint yield token
+    coin::mint_and_transfer(&mut yield_token_info.yield_token_treasury_cap, yield_token_amount, recipient, ctx);
 }
 
 

@@ -3,7 +3,7 @@
 import { useSuiWallet } from '@/hooks/use-suiet-wallet';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { TransactionBlock } from '@mysten/sui.js/transactions';
+import { Transaction } from '@mysten/sui/transactions';
 import { useState } from 'react';
 import { Check, Loader2 } from 'lucide-react';
 
@@ -26,7 +26,7 @@ export default function WalletInteraction() {
 
     try {
       // 创建交易块
-      const tx = new TransactionBlock();
+      const tx = new Transaction();
       
       // 这是一个示例交易，只是在链上记录一条消息
       tx.moveCall({
@@ -34,7 +34,6 @@ export default function WalletInteraction() {
         arguments: [
           tx.pure.address(wallet.account?.address || ''),
           tx.pure.string('RWAS Dubai Test Transaction'),
-          tx.pure([])
         ],
       });
 

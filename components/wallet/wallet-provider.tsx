@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import { SuiClient, getFullnodeUrl } from '@mysten/sui.js/client';
+import { SuiClient, getFullnodeUrl } from '@mysten/sui/client';
 import { WalletProvider as DappKitWalletProvider } from '@mysten/dapp-kit';
 
 // 使用testnet网络

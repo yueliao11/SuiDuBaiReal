@@ -169,3 +169,16 @@ public entry fun unstake(
     });
 }
 
+// view function
+public fun get_user_staken_amount(
+    pool: &StakePool,
+    user: address
+): u64  {
+    // 检查用户是否存在质押信息
+    assert!(table::contains(&pool.user_stakes, user), ENotStaked);
+    // 获取用户的 StakeInfo 对象
+    let stake_info = table::borrow(&pool.user_stakes, user);
+    // 返回用户的质押数量
+    stake_info.staked_amount
+}
+
