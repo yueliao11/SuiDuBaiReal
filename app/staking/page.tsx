@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSuiWallet } from '@/hooks/use-suiet-wallet';
 import { TrendingUp, BadgeDollarSign, Info, History } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -12,7 +12,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useToast } from '@/hooks/use-toast';
 import ClientSuietConnect from '@/components/wallet/client-suiet-connect';
 import { suiClient } from "@/config";
-import { queryBalance, stake } from '@/contracts';
+import { queryBalance, stake, queryStakePoolInfo, queryUserStakeInfoAmount } from '@/contracts';
+import { bcs } from '@mysten/sui/bcs';
 
 // Mock staking data - in a real app this would come from the blockchain
 const stakingData = {
@@ -51,7 +52,74 @@ export default function Staking() {
   const [unstakeAmount, setUnstakeAmount] = useState('');
   const [activeTab, setActiveTab] = useState('stake');
   const [availableBalance, setAvailableBalance] = useState(0);
+  const [totalStaked, setTotalStaked] = useState<number>(0);
+  const [myStake, setMyStake] = useState<number>(0);
 
+  // Function to fetch and refresh staking data (Total Staked, My Stake)
+  const refreshStakingData = useCallback(async () => {
+    if (isConnected && wallet.address) {
+      let fetchedTotalStaked = 0;
+      let fetchedMyStake = 0;
+
+      try {
+        // Fetch Total Staked
+        const poolInfo = await queryStakePoolInfo();
+        fetchedTotalStaked = poolInfo.total_staked / 1e9;
+        setTotalStaked(fetchedTotalStaked);
+
+        // Try to fetch User Stake Amount
+        try {
+          const inspectResult = await queryUserStakeInfoAmount(wallet.address);
+
+          if (inspectResult.effects.status.status === 'success') {
+            if (inspectResult.results?.[0]?.returnValues?.[0]?.[0]) {
+              const returnValueBytes = inspectResult.results[0].returnValues[0][0];
+              console.log("Raw bytes for user stake:", returnValueBytes);
+              try {
+                const deserializedValue = bcs.U64.parse(new Uint8Array(returnValueBytes));
+                console.log("Deserialized user stake (u64):", deserializedValue);
+                fetchedMyStake = Number(deserializedValue) / 1e9;
+              } catch (parseError) {
+                console.error("Failed to parse user stake amount:", parseError);
+                // fetchedMyStake remains 0
+              }
+            } else {
+              console.log("User has no stake or return value format is unexpected.");
+              // fetchedMyStake remains 0
+            }
+          } else {
+            // devInspect itself was not successful for user stake query
+            console.warn(
+              `Failed to inspect user stake amount: ${inspectResult.effects.status.error || 'Unknown error'}`,
+              inspectResult
+            );
+            // fetchedMyStake remains 0
+          }
+        } catch (userStakeError) {
+          console.error('Error fetching user stake amount specifically:', userStakeError);
+          // fetchedMyStake remains 0, toast for this specific failure if desired
+          // toast({ variant: "warning", title: "Notice", description: "Could not retrieve your stake amount." });
+        }
+        setMyStake(fetchedMyStake); // Set MyStake after attempting to fetch it
+
+      } catch (error) {
+        // This catch block now primarily handles errors from queryStakePoolInfo or major issues
+        console.error('Error fetching staking data (likely total staked or critical issue):', error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to fetch staking data. Some values may be incorrect.", // Updated message
+        });
+        setTotalStaked(0); // Reset total staked on critical error
+        setMyStake(0);     // Reset my stake on critical error
+      }
+    } else {
+      setTotalStaked(0);
+      setMyStake(0);
+    }
+  }, [isConnected, wallet.address, toast]);
+
+  // useEffect to fetch initial balance
   useEffect(() => {
     const fetchBalance = async () => {
       if (isConnected && wallet.address) {
@@ -68,9 +136,13 @@ export default function Staking() {
         }
       }
     };
-
     fetchBalance();
   }, [isConnected, wallet.address, toast]);
+
+  // useEffect to fetch initial staking data
+  useEffect(() => {
+    refreshStakingData();
+  }, [refreshStakingData]); // Depend on the memoized refresh function
 
   const handleStake = async () => {
     if (!isConnected) {
@@ -129,15 +201,22 @@ export default function Staking() {
           title: "Staking successful",
           description: `Successfully staked ${amount} RWAS tokens`,
         });
+        
+        // Refresh data after successful stake
+        await refreshStakingData(); 
+        // Also refresh available balance
+        const balanceResult = await queryBalance(wallet.address!); // Keep this specific balance refresh
+        setAvailableBalance(Number(balanceResult.totalBalance) / 1e9);
+
       } else {
         throw new Error(`Staking transaction failed with status: ${txDetails.effects?.status.status}`);
       }
 
-      setStakeAmount('');
+      setStakeAmount(''); // Move this here, only clear amount on full success
       
-      // Refresh balance after staking
-      const balanceResult = await queryBalance(wallet.address!);
-      setAvailableBalance(Number(balanceResult.totalBalance) / 1e9);
+      // Remove balance refresh from here as it's handled above
+      // const balanceResult = await queryBalance(wallet.address!);
+      // setAvailableBalance(Number(balanceResult.totalBalance) / 1e9);
     } catch (error) {
       console.error('Error staking:', error);
       toast({
@@ -168,7 +247,7 @@ export default function Staking() {
       return;
     }
 
-    if (amount > stakingData.myStake) {
+    if (amount > myStake) {
       toast({
         variant: "destructive",
         title: "Insufficient staked amount",
@@ -252,7 +331,7 @@ export default function Staking() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">
-              {stakingData.totalStaked.toLocaleString()} RWAS
+              {totalStaked.toLocaleString()} RWAS
             </div>
             <p className="text-muted-foreground text-sm">By all stakers</p>
           </CardContent>
@@ -264,7 +343,7 @@ export default function Staking() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">
-              {stakingData.myStake.toLocaleString()} RWAS
+              {myStake.toLocaleString()} RWAS
             </div>
             <p className="text-muted-foreground text-sm">Your staked amount</p>
           </CardContent>
@@ -319,7 +398,7 @@ export default function Staking() {
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
                       <span>Staked Amount</span>
-                      <span>{stakingData.myStake.toLocaleString()} RWAS</span>
+                      <span>{myStake.toLocaleString()} RWAS</span>
                     </div>
                     <div className="flex space-x-2">
                       <Input
@@ -330,7 +409,7 @@ export default function Staking() {
                       />
                       <Button
                         variant="outline"
-                        onClick={() => setUnstakeAmount(stakingData.myStake.toString())}
+                        onClick={() => setUnstakeAmount(myStake.toString())}
                       >
                         Max
                       </Button>
@@ -338,7 +417,7 @@ export default function Staking() {
                     <Button 
                       className="w-full"
                       onClick={handleUnstake}
-                      disabled={!unstakeAmount || parseFloat(unstakeAmount) <= 0}
+                      disabled={!unstakeAmount || parseFloat(unstakeAmount) <= 0 || parseFloat(unstakeAmount) > myStake}
                     >
                       Unstake RWAS
                     </Button>

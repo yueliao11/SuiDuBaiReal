@@ -1,6 +1,11 @@
 import { networkConfig, suiClient } from "@/config";
 import { Transaction } from "@mysten/sui/transactions";
-import { isValidSuiAddress } from "@mysten/sui/utils";
+import { StakePool } from "../type";
+import {
+  SuiObjectResponse,
+  SuiParsedData,
+  SuiObjectData,
+} from "@mysten/sui/client";
 import {StakeModule, YieldTokenModule, CoinType, Clock} from "../constants/index"
 
 
@@ -46,6 +51,56 @@ export const queryAllCoin = async (address: string, type: string) => {
     return coinArr;
   };
   
+
+  // query stakePoolInfo object 
+export const queryStakePoolInfo = async () => {
+  const stakePoolInfoContent = await suiClient.getObject({
+    id: networkConfig.testnet.StakePool,
+    options: {
+      showContent: true,
+    },
+  });
+
+  if (!stakePoolInfoContent.data?.content) {
+    throw new Error("StakePool content not found");
+  }
+
+  const parsedStakePool = stakePoolInfoContent.data.content as SuiParsedData;
+  if (!("fields" in parsedStakePool)) {
+    throw new Error("Invalid stake_pool data structure");
+  }
+
+  const stake_pool = parsedStakePool.fields as unknown as StakePool;
+  if (!stake_pool) {
+    throw new Error("Invalid stake_pool data structure");
+  }
+
+  return stake_pool;
+}
+
+
+// query user_stake_info amount
+export const queryUserStakeInfoAmount = async (user_address: string):Promise<any> => {
+  const tx = new Transaction();
+  // 配置查询call
+  tx.moveCall({
+      package: networkConfig.testnet.packageID,
+      module: StakeModule.MODULE_NAME,
+      function: StakeModule.VIEW_FUNCTIONS.GET_USER_STAKEN_AMOUNT,
+      arguments: [
+          tx.object(networkConfig.testnet.StakePool),
+          tx.pure.address(user_address)
+      ],
+  });
+
+  // 执行检查
+  const txDetails = await suiClient.devInspectTransactionBlock({
+    sender: user_address,
+    transactionBlock: tx,
+  });
+  
+  return txDetails;
+}
 
 
 export const stake = async(

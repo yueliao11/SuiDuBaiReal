@@ -3,8 +3,9 @@ export const StakeModule = {
     FUNCTIONS: {
       STAKE: "stake",
       UNSTAKE: "unstake",
-      // TODO: Add claim_rewards function if implemented
-      // TODO: Add calculate_pending_rewards function if it's public and needed externally
+    },
+    VIEW_FUNCTIONS: {
+      GET_USER_STAKEN_AMOUNT: "get_user_staken_amount"
     },
     STRUCT: {
       STAKE_INFO: "StakeInfo",
